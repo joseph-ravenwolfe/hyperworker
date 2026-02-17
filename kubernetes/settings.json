@@ -1,0 +1,38 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "Read(*)",
+      "LS(*)",
+      "Grep(*)",
+      "Search(*)",
+      "Glob(*)",
+      "mcp__atlassian",
+      "mcp__Ref"
+    ],
+    "deny": [
+      "Bash(gcloud*prod*)",
+      "Bash(kubectl*--context*prod*)",
+      "Bash(tsh*prod*)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENTS_TEAMS": "1",
+    "CLAUDE_CODE_TASK_LIST_ID": "my-new-feature"
+  },
+  "enabledPlugins": {
+    "github@claude-plugins-official": true,
+    "atlassian@claude-plugins-official": true
+  },
+  "spinnerTipsEnabled": false,
+  "bypassPermissions": true
+}
