@@ -23,9 +23,9 @@ hyperworker/
 ├── typescript/                        # TypeScript / Node.js stack
 │   ├── .claude/
 │   │   └── skills/
-│   │       ├── hyperworker/           # (placeholder — coming soon)
-│   │       ├── prd/                   # (placeholder — coming soon)
-│   │       ├── prd-tasks/             # (placeholder — coming soon)
+│   │       ├── hyperworker/SKILL.md   # Multi-agent team lead (TS variant)
+│   │       ├── prd/SKILL.md           # PRD generator (TS examples)
+│   │       ├── prd-tasks/SKILL.md     # PRD-to-tasks converter (TS variant)
 │   │       ├── refactor-agents-md/SKILL.md
 │   │       ├── refactor-claude-md/SKILL.md
 │   │       └── refactor-skills-md/SKILL.md
@@ -54,9 +54,9 @@ The workflow is the same regardless of technology stack. The skills within each 
 
 | Workflow Phase | Kubernetes Variant | TypeScript Variant |
 |---|---|---|
-| `/prd` | [kubernetes/.claude/skills/prd/](kubernetes/.claude/skills/prd/SKILL.md) | [typescript/.claude/skills/prd/](typescript/.claude/skills/prd/) (coming soon) |
-| `/prd-tasks` | [kubernetes/.claude/skills/prd-tasks/](kubernetes/.claude/skills/prd-tasks/SKILL.md) | [typescript/.claude/skills/prd-tasks/](typescript/.claude/skills/prd-tasks/) (coming soon) |
-| `/hyperworker` | [kubernetes/.claude/skills/hyperworker/](kubernetes/.claude/skills/hyperworker/SKILL.md) | [typescript/.claude/skills/hyperworker/](typescript/.claude/skills/hyperworker/) (coming soon) |
+| `/prd` | [kubernetes/.claude/skills/prd/](kubernetes/.claude/skills/prd/SKILL.md) | [typescript/.claude/skills/prd/](typescript/.claude/skills/prd/SKILL.md) |
+| `/prd-tasks` | [kubernetes/.claude/skills/prd-tasks/](kubernetes/.claude/skills/prd-tasks/SKILL.md) | [typescript/.claude/skills/prd-tasks/](typescript/.claude/skills/prd-tasks/SKILL.md) |
+| `/hyperworker` | [kubernetes/.claude/skills/hyperworker/](kubernetes/.claude/skills/hyperworker/SKILL.md) | [typescript/.claude/skills/hyperworker/](typescript/.claude/skills/hyperworker/SKILL.md) |
 
 ### Agent Behavior
 
@@ -72,16 +72,16 @@ Each dispatched agent:
 **Kubernetes-specific behavior:**
 - Suspends Flux before changes, applies file-first manifests, validates, then resumes Flux — logging every cluster action for auditability
 
-**TypeScript-specific behavior** (coming soon):
+**TypeScript-specific behavior:**
 - Runs `tsc --noEmit` for type checking, linter, and test suite as quality gates
 
 ## Included Skills
 
 | Skill | Command | Kubernetes | TypeScript | Purpose |
 |---|---|---|---|---|
-| **hyperworker** | `/hyperworker` | Available | Coming soon | Multi-agent team lead — dispatches and supervises autonomous agents |
-| **prd** | `/prd` | Available | Coming soon | Generate a PRD from a feature description |
-| **prd-tasks** | `/prd-tasks` | Available | Coming soon | Convert a PRD into dependency-ordered tasks |
+| **hyperworker** | `/hyperworker` | Available | Available | Multi-agent team lead — dispatches and supervises autonomous agents |
+| **prd** | `/prd` | Available | Available | Generate a PRD from a feature description |
+| **prd-tasks** | `/prd-tasks` | Available | Available | Convert a PRD into dependency-ordered tasks |
 | **refactor-agents-md** | `/refactor-agents-md` | Available | Available | Refactor an AGENTS.md file for progressive disclosure |
 | **refactor-claude-md** | `/refactor-claude-md` | Available | Available | Refactor a CLAUDE.md file for progressive disclosure |
 | **refactor-skills-md** | `/refactor-skills-md` | Available | Available | Refactor a SKILL.md file for progressive disclosure |
