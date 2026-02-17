@@ -38,7 +38,7 @@ Before doing anything else, run these checks in order. **Stop and surface each i
    > ⚠️ The `CLAUDE_CODE_TASK_LIST_ID` in `.claude/settings.json` (`<branch>`) does not appear to match the PRD's branch context. You may need to update settings or re-run the PRD skill.
 
 #### Step 3 — Warn about stale Claude Code session
-1. If the **PRD skill** (`prd-exp`) was invoked earlier in this same Claude Code session (i.e., `.claude/settings.json` was updated during this session), the running session may still be using the **old** `CLAUDE_CODE_TASK_LIST_ID` value.
+1. If the **PRD skill** (`prd`) was invoked earlier in this same Claude Code session (i.e., `.claude/settings.json` was updated during this session), the running session may still be using the **old** `CLAUDE_CODE_TASK_LIST_ID` value.
 2. In that case, warn the user:
    > ⚠️ It looks like the PRD skill was run during this session, which updated `.claude/settings.json`. You need to **restart your Claude Code session** so the tasks agent picks up the new `CLAUDE_CODE_TASK_LIST_ID` value. Please restart and re-invoke this skill.
 3. Use **AskUserQuestion** to confirm whether the user wants to continue or restart. If they say restart, **stop here**.
@@ -122,7 +122,7 @@ When creating tasks, append these criteria to every story's acceptance criteria:
 - **All stories:** "Have objective and testable acceptance criteria, typecheck passes"
 - **Stories that change UI:** "Verify in browser using dev-browser skill"
 
-If you need to write **new** stories (e.g., to cover an uncovered functional requirement), follow the acceptance criteria guidance in the PRD skill (`prd-exp`) — criteria must be concrete, testable, and indicate the "how."
+If you need to write **new** stories (e.g., to cover an uncovered functional requirement), follow the acceptance criteria guidance in the PRD skill (`prd`) — criteria must be concrete, testable, and indicate the "how."
 
 ---
 
@@ -140,7 +140,7 @@ If you need to write **new** stories (e.g., to cover an uncovered functional req
 
 After extracting stories from the PRD, cross-check against the **Functional Requirements** section (if present):
 
-1. Read every numbered FR (e.g., `OPSFR-1`, `OPSFR-2`, …) in the PRD
+1. Read every numbered FR (e.g., `FR-1`, `FR-2`, …) in the PRD
 2. For each FR, verify it is traceable to at least one story's acceptance criteria
 3. If an FR is **not covered** by any story:
    - If it fits naturally as acceptance criteria on an existing story, add it there
