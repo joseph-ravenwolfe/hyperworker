@@ -326,11 +326,50 @@ async function mergeUserSettings(opts, sourceDir, stack) {
 }
 
 /**
+ * Check if the target directory is a git repository, warn if not.
  * Add /plans to .gitignore if not already present.
- * HW-09-07 will implement this.
  */
 async function updateGitignore(opts, targetDir) {
-  console.log('[TODO] updateGitignore: will be implemented in HW-09-07');
+  // Check if target is a git repository
+  const gitDir = path.join(targetDir, '.git');
+  const isGitRepo = fs.existsSync(gitDir);
+  if (!isGitRepo) {
+    console.warn('Warning: Target directory is not a git repository. Skipping .gitignore update.');
+    return;
+  }
+
+  const gitignorePath = path.join(targetDir, '.gitignore');
+  const entry = '/plans';
+
+  // Check if .gitignore exists
+  if (fs.existsSync(gitignorePath)) {
+    const content = fs.readFileSync(gitignorePath, 'utf8');
+    const lines = content.split('\n');
+
+    // Check for exact line match
+    if (lines.some((line) => line === entry)) {
+      console.log('.gitignore already contains /plans — no changes needed.');
+      return;
+    }
+
+    // Append /plans
+    if (opts.dryRun) {
+      console.log('[DRY RUN] Would append /plans to .gitignore');
+    } else {
+      // Ensure we start on a new line if file doesn't end with one
+      const suffix = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+      fs.writeFileSync(gitignorePath, content + suffix + entry + '\n', 'utf8');
+      console.log('Appended /plans to .gitignore');
+    }
+  } else {
+    // Create .gitignore with /plans
+    if (opts.dryRun) {
+      console.log('[DRY RUN] Would create .gitignore with /plans');
+    } else {
+      fs.writeFileSync(gitignorePath, entry + '\n', 'utf8');
+      console.log('Created .gitignore with /plans');
+    }
+  }
 }
 
 /**
