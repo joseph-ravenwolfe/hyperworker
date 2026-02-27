@@ -359,18 +359,320 @@ async function selectStack(opts, sourceDir) {
 
 /**
  * Copy skill files from the source stack into the target project.
- * HW-09-03 will implement conflict resolution.
+ *
+ * Walks each skill directory under <sourceDir>/<stack>/.claude/skills/ and
+ * copies it into <targetDir>/.claude/skills/.  When a file already exists at
+ * the target, the user is prompted to skip, overwrite, or view a diff.
+ *
+ * In --yes mode, conflicting files are auto-skipped (non-destructive default).
+ * In --dry-run mode, no files are written and a preview is printed instead.
  */
 async function installSkills(opts, sourceDir, stack, targetDir) {
-  console.log('[TODO] installSkills: will be implemented in HW-09-03');
+  const skillsSrc = path.join(sourceDir, stack, '.claude', 'skills');
+  const skillsDst = path.join(targetDir, '.claude', 'skills');
+
+  // Verify source skills directory exists
+  if (!fs.existsSync(skillsSrc)) {
+    console.log('No skills directory found in source stack. Skipping skill installation.');
+    return;
+  }
+
+  // Discover skill directories (each direct child of skillsSrc)
+  const skillDirs = fs.readdirSync(skillsSrc, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name);
+
+  if (skillDirs.length === 0) {
+    console.log('No skill directories found. Skipping skill installation.');
+    return;
+  }
+
+  console.log(`\nInstalling skills from ${stack} stack...`);
+
+  // Ensure target .claude/skills/ exists (unless dry-run)
+  if (!opts.dryRun) {
+    fs.mkdirSync(skillsDst, { recursive: true });
+  }
+
+  // Collect all files to process: { relativePath, srcPath, dstPath }
+  const filesToProcess = [];
+  for (const dir of skillDirs) {
+    const srcDir = path.join(skillsSrc, dir);
+    const entries = walkDir(srcDir);
+    for (const relPath of entries) {
+      filesToProcess.push({
+        relativePath: path.join(dir, relPath),
+        srcPath: path.join(srcDir, relPath),
+        dstPath: path.join(skillsDst, dir, relPath),
+      });
+    }
+  }
+
+  // Track results for summary
+  const installed = [];
+  const skipped = [];
+
+  // Set up readline only if we need interactive prompts
+  let rl = null;
+  let ask = null;
+  if (!opts.dryRun && !opts.yes) {
+    const readline = require('readline');
+    rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    ask = (question) => new Promise((resolve) => rl.question(question, resolve));
+  }
+
+  try {
+    for (const file of filesToProcess) {
+      const exists = fs.existsSync(file.dstPath);
+
+      // --- Dry-run mode ---
+      if (opts.dryRun) {
+        if (exists) {
+          console.log(`  [DRY RUN] CONFLICT: ${file.relativePath} (would skip — file exists)`);
+          skipped.push(file.relativePath);
+        } else {
+          console.log(`  [DRY RUN] COPY: ${file.relativePath}`);
+          installed.push(file.relativePath);
+        }
+        continue;
+      }
+
+      // --- No conflict: copy directly ---
+      if (!exists) {
+        const dstDir = path.dirname(file.dstPath);
+        fs.mkdirSync(dstDir, { recursive: true });
+        fs.cpSync(file.srcPath, file.dstPath, { recursive: true });
+        console.log(`  Installed: ${file.relativePath}`);
+        installed.push(file.relativePath);
+        continue;
+      }
+
+      // --- Conflict exists ---
+      if (opts.yes) {
+        // Non-interactive: auto-skip conflicts
+        console.log(`  Skipped (exists): ${file.relativePath}`);
+        skipped.push(file.relativePath);
+        continue;
+      }
+
+      // --- Interactive conflict resolution ---
+      let resolved = false;
+      while (!resolved) {
+        const answer = (
+          await ask(`  File exists: ${file.relativePath} — [s]kip / [o]verwrite / [d]iff? `)
+        ).trim().toLowerCase();
+
+        switch (answer) {
+          case 's':
+          case 'skip':
+            console.log(`  Skipped: ${file.relativePath}`);
+            skipped.push(file.relativePath);
+            resolved = true;
+            break;
+
+          case 'o':
+          case 'overwrite':
+            fs.cpSync(file.srcPath, file.dstPath, { recursive: true });
+            console.log(`  Overwritten: ${file.relativePath}`);
+            installed.push(file.relativePath);
+            resolved = true;
+            break;
+
+          case 'd':
+          case 'diff': {
+            try {
+              const diff = execSync(
+                `diff -u "${file.dstPath}" "${file.srcPath}"`,
+                { encoding: 'utf8' }
+              );
+              // diff returns exit code 0 when files are identical
+              console.log('\n  Files are identical.\n');
+            } catch (e) {
+              // diff returns exit code 1 when files differ (not a real error)
+              if (e.stdout) {
+                console.log(`\n${e.stdout}`);
+              } else {
+                console.log('\n  Could not generate diff.\n');
+              }
+            }
+            // Re-prompt (don't set resolved)
+            break;
+          }
+
+          default:
+            console.log('  Please enter s (skip), o (overwrite), or d (diff).');
+            break;
+        }
+      }
+    }
+  } finally {
+    if (rl) {
+      rl.close();
+    }
+  }
+
+  // --- Summary ---
+  console.log(`\nSkills summary: ${installed.length} installed, ${skipped.length} skipped.`);
+  if (installed.length > 0) {
+    console.log('  Installed:');
+    installed.forEach((f) => console.log(`    - ${f}`));
+  }
+  if (skipped.length > 0) {
+    console.log('  Skipped:');
+    skipped.forEach((f) => console.log(`    - ${f}`));
+  }
+}
+
+/**
+ * Recursively walk a directory and return relative file paths.
+ */
+function walkDir(dir, prefix) {
+  prefix = prefix || '';
+  const results = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const relPath = prefix ? path.join(prefix, entry.name) : entry.name;
+    if (entry.isDirectory()) {
+      results.push(...walkDir(path.join(dir, entry.name), relPath));
+    } else {
+      results.push(relPath);
+    }
+  }
+  return results;
 }
 
 /**
  * Reverse-merge project-level settings.json into target's .claude/settings.json.
- * HW-09-05 will implement the merge logic (using the utility from HW-09-04).
+ *
+ * Reads the source stack's settings.json and reverse-merges it into the
+ * target project's .claude/settings.json.  Source fills gaps; target values
+ * are always preserved.  Uses atomic write (temp file + rename) for safety.
+ *
+ * For invalid/empty JSON in the target: warns and asks to overwrite or skip.
+ * In --yes mode, invalid target JSON is skipped (never silently overwritten).
  */
 async function mergeProjectSettings(opts, sourceDir, stack, targetDir) {
-  console.log('[TODO] mergeProjectSettings: will be implemented in HW-09-05');
+  const sourcePath = path.join(sourceDir, stack, 'settings.json');
+  const claudeDir = path.join(targetDir, '.claude');
+  const targetPath = path.join(claudeDir, 'settings.json');
+
+  console.log('\nMerging project settings...');
+
+  // --- Read source settings ---
+  if (!fs.existsSync(sourcePath)) {
+    console.log(`  No source settings.json found at ${sourcePath} — skipping.`);
+    return;
+  }
+
+  let sourceSettings;
+  try {
+    sourceSettings = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+  } catch (err) {
+    console.error(`  Error: Could not parse source settings.json at ${sourcePath}: ${err.message}`);
+    process.exit(1);
+  }
+
+  // --- Read target settings (or create if missing) ---
+  let targetSettings = null;
+  let targetExists = fs.existsSync(targetPath);
+  let targetWasEmpty = false;
+
+  if (targetExists) {
+    const raw = fs.readFileSync(targetPath, 'utf8');
+    try {
+      targetSettings = JSON.parse(raw);
+    } catch (err) {
+      // Invalid JSON in target — warn and ask
+      console.warn(`  Warning: Invalid JSON in ${targetPath}: ${err.message}`);
+
+      if (opts.yes) {
+        // Non-interactive: skip to avoid destroying user data
+        console.log('  --yes mode: skipping project settings merge (invalid target JSON).');
+        return;
+      }
+
+      // Interactive: ask user whether to overwrite or skip
+      const readline = require('readline');
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+      const ask = (question) =>
+        new Promise((resolve) => rl.question(question, resolve));
+
+      try {
+        const answer = (
+          await ask('  Overwrite with hyperworker defaults? (y/N): ')
+        ).trim().toLowerCase();
+
+        if (answer === 'y' || answer === 'yes') {
+          // Treat target as empty — source becomes the full result
+          targetSettings = {};
+          console.log('  Overwriting invalid target settings.');
+        } else {
+          console.log('  Skipping project settings merge.');
+          return;
+        }
+      } finally {
+        rl.close();
+      }
+    }
+  } else {
+    // Target file does not exist — start from empty
+    targetSettings = {};
+    targetWasEmpty = true;
+  }
+
+  // --- Perform reverse merge ---
+  const merged = reverseMerge(targetSettings, sourceSettings);
+
+  // --- Before/after summary ---
+  const beforeJson = JSON.stringify(targetSettings, null, 2);
+  const afterJson = JSON.stringify(merged, null, 2);
+
+  if (beforeJson === afterJson) {
+    console.log('  Project settings already up to date — no changes needed.');
+    return;
+  }
+
+  console.log('\n  Project settings changes (.claude/settings.json):');
+  console.log('  --- Before ---');
+  if (targetWasEmpty) {
+    console.log('    (file did not exist)');
+  } else {
+    beforeJson.split('\n').forEach((line) => console.log(`    ${line}`));
+  }
+  console.log('  --- After ---');
+  afterJson.split('\n').forEach((line) => console.log(`    ${line}`));
+  console.log();
+
+  // --- Dry-run: stop here ---
+  if (opts.dryRun) {
+    console.log('  [DRY RUN] Would write merged settings to .claude/settings.json');
+    return;
+  }
+
+  // --- Ensure .claude/ directory exists ---
+  if (!fs.existsSync(claudeDir)) {
+    fs.mkdirSync(claudeDir, { recursive: true });
+  }
+
+  // --- Atomic write: temp file + rename ---
+  const content = JSON.stringify(merged, null, 2) + '\n';
+  const tmpPath = path.join(claudeDir, `.settings.json.${process.pid}.tmp`);
+  try {
+    fs.writeFileSync(tmpPath, content, 'utf8');
+    fs.renameSync(tmpPath, targetPath);
+  } catch (err) {
+    // Clean up temp file on failure
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    throw err;
+  }
+
+  console.log('  Wrote merged settings to .claude/settings.json');
 }
 
 /**
