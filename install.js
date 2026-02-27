@@ -374,7 +374,7 @@ async function installSkills(opts, sourceDir, stack, targetDir) {
   // Verify source skills directory exists
   if (!fs.existsSync(skillsSrc)) {
     console.log('No skills directory found in source stack. Skipping skill installation.');
-    return;
+    return { installed: [], skipped: [] };
   }
 
   // Discover skill directories (each direct child of skillsSrc)
@@ -384,7 +384,7 @@ async function installSkills(opts, sourceDir, stack, targetDir) {
 
   if (skillDirs.length === 0) {
     console.log('No skill directories found. Skipping skill installation.');
-    return;
+    return { installed: [], skipped: [] };
   }
 
   console.log(`\nInstalling skills from ${stack} stack...`);
@@ -524,6 +524,8 @@ async function installSkills(opts, sourceDir, stack, targetDir) {
     console.log('  Skipped:');
     skipped.forEach((f) => console.log(`    - ${f}`));
   }
+
+  return { installed, skipped };
 }
 
 /**
@@ -564,7 +566,7 @@ async function mergeProjectSettings(opts, sourceDir, stack, targetDir) {
   // --- Read source settings ---
   if (!fs.existsSync(sourcePath)) {
     console.log(`  No source settings.json found at ${sourcePath} — skipping.`);
-    return;
+    return { added: [], unchanged: [], status: 'skipped' };
   }
 
   let sourceSettings;
@@ -591,7 +593,7 @@ async function mergeProjectSettings(opts, sourceDir, stack, targetDir) {
       if (opts.yes) {
         // Non-interactive: skip to avoid destroying user data
         console.log('  --yes mode: skipping project settings merge (invalid target JSON).');
-        return;
+        return { added: [], unchanged: [], status: 'skipped' };
       }
 
       // Interactive: ask user whether to overwrite or skip
@@ -614,7 +616,7 @@ async function mergeProjectSettings(opts, sourceDir, stack, targetDir) {
           console.log('  Overwriting invalid target settings.');
         } else {
           console.log('  Skipping project settings merge.');
-          return;
+          return { added: [], unchanged: [], status: 'skipped' };
         }
       } finally {
         rl.close();
@@ -635,8 +637,17 @@ async function mergeProjectSettings(opts, sourceDir, stack, targetDir) {
 
   if (beforeJson === afterJson) {
     console.log('  Project settings already up to date — no changes needed.');
-    return;
+    return { added: [], unchanged: Object.keys(targetSettings), status: 'unchanged' };
   }
+
+  // Compute key-level change summary
+  const projBeforeKeys = Object.keys(targetSettings);
+  const projAfterKeys = Object.keys(merged);
+  const projAddedKeys = projAfterKeys.filter((k) => !projBeforeKeys.includes(k));
+  const projChangedKeys = projAfterKeys.filter((k) => {
+    return JSON.stringify(targetSettings[k]) !== JSON.stringify(merged[k]);
+  });
+  const projUnchangedKeys = projBeforeKeys.filter((k) => !projChangedKeys.includes(k));
 
   console.log('\n  Project settings changes (.claude/settings.json):');
   console.log('  --- Before ---');
@@ -652,7 +663,7 @@ async function mergeProjectSettings(opts, sourceDir, stack, targetDir) {
   // --- Dry-run: stop here ---
   if (opts.dryRun) {
     console.log('  [DRY RUN] Would write merged settings to .claude/settings.json');
-    return;
+    return { added: projAddedKeys, unchanged: projUnchangedKeys, status: 'dry-run' };
   }
 
   // --- Ensure .claude/ directory exists ---
@@ -673,6 +684,7 @@ async function mergeProjectSettings(opts, sourceDir, stack, targetDir) {
   }
 
   console.log('  Wrote merged settings to .claude/settings.json');
+  return { added: projAddedKeys, unchanged: projUnchangedKeys, status: 'updated' };
 }
 
 /**
@@ -697,7 +709,7 @@ async function mergeUserSettings(opts, sourceDir, stack) {
   // --- Read source user-settings.json ---
   if (!fs.existsSync(sourceSettingsPath)) {
     console.log(`  No user-settings.json found at ${sourceSettingsPath} — skipping.`);
-    return;
+    return { added: [], unchanged: [], status: 'skipped' };
   }
 
   let sourceSettings;
@@ -742,7 +754,7 @@ async function mergeUserSettings(opts, sourceDir, stack) {
 
         if (opts.yes) {
           console.log('  --yes mode: skipping user settings merge (invalid target JSON).');
-          return;
+          return { added: [], unchanged: [], status: 'skipped' };
         }
 
         // Interactive prompt: ask to overwrite or skip
@@ -764,7 +776,7 @@ async function mergeUserSettings(opts, sourceDir, stack) {
             console.log('  Overwriting invalid settings file.');
           } else {
             console.log('  Skipping user settings merge.');
-            return;
+            return { added: [], unchanged: [], status: 'skipped' };
           }
         } finally {
           rl.close();
@@ -785,7 +797,7 @@ async function mergeUserSettings(opts, sourceDir, stack) {
 
   if (beforeJson === afterJson) {
     console.log('  User settings already up to date — no changes needed.');
-    return;
+    return { added: [], unchanged: Object.keys(targetSettings), status: 'unchanged' };
   }
 
   // Compute key-level change summary
@@ -820,7 +832,7 @@ async function mergeUserSettings(opts, sourceDir, stack) {
   // --- Dry run: stop here ---
   if (opts.dryRun) {
     console.log('  [DRY RUN] Would write merged settings to ~/.claude/settings.json');
-    return;
+    return { added: addedKeys, unchanged: preservedKeys, status: 'dry-run' };
   }
 
   // --- Atomic write: temp file + rename ---
@@ -841,6 +853,8 @@ async function mergeUserSettings(opts, sourceDir, stack) {
   } else {
     console.log(`  Created ${targetSettingsPath}`);
   }
+
+  return { added: addedKeys, unchanged: preservedKeys, status: 'updated' };
 }
 
 /**
@@ -853,7 +867,7 @@ async function updateGitignore(opts, targetDir) {
   const isGitRepo = fs.existsSync(gitDir);
   if (!isGitRepo) {
     console.warn('Warning: Target directory is not a git repository. Skipping .gitignore update.');
-    return;
+    return { status: 'skipped', reason: 'not a git repo' };
   }
 
   const gitignorePath = path.join(targetDir, '.gitignore');
@@ -867,35 +881,122 @@ async function updateGitignore(opts, targetDir) {
     // Check for exact line match
     if (lines.some((line) => line === entry)) {
       console.log('.gitignore already contains /plans — no changes needed.');
-      return;
+      return { status: 'already-present' };
     }
 
     // Append /plans
     if (opts.dryRun) {
       console.log('[DRY RUN] Would append /plans to .gitignore');
+      return { status: 'dry-run', action: 'would append' };
     } else {
       // Ensure we start on a new line if file doesn't end with one
       const suffix = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
       fs.writeFileSync(gitignorePath, content + suffix + entry + '\n', 'utf8');
       console.log('Appended /plans to .gitignore');
+      return { status: 'updated', action: 'appended' };
     }
   } else {
     // Create .gitignore with /plans
     if (opts.dryRun) {
       console.log('[DRY RUN] Would create .gitignore with /plans');
+      return { status: 'dry-run', action: 'would create' };
     } else {
       fs.writeFileSync(gitignorePath, entry + '\n', 'utf8');
       console.log('Created .gitignore with /plans');
+      return { status: 'created', action: 'created' };
     }
   }
 }
 
 /**
  * Print a summary of all changes made during installation.
- * HW-09-09 will implement the full summary.
+ *
+ * Collects results from each step (skills, project settings, user settings,
+ * gitignore) and formats a clean summary output.  After a real install,
+ * also prints "next steps" guidance.
+ *
+ * @param {object}  opts            - The parsed CLI options.
+ * @param {object}  results         - Result objects from each step.
+ * @param {object}  results.skills  - { installed: string[], skipped: string[] }
+ * @param {object}  results.projectSettings - { added: string[], unchanged: string[], status: string }
+ * @param {object}  results.userSettings    - { added: string[], unchanged: string[], status: string }
+ * @param {object}  results.gitignore       - { status: string, action?: string, reason?: string }
  */
-function printSummary(opts) {
-  console.log('[TODO] printSummary: will be implemented in HW-09-09');
+function printSummary(opts, results) {
+  const { skills, projectSettings, userSettings, gitignore } = results;
+
+  console.log('\n' + '='.repeat(60));
+  if (opts.dryRun) {
+    console.log('  DRY RUN SUMMARY — no files were written');
+  } else {
+    console.log('  INSTALLATION SUMMARY');
+  }
+  console.log('='.repeat(60));
+
+  // --- Skills ---
+  console.log('\n  Skills:');
+  const newCount = skills.installed.length;
+  const skipCount = skills.skipped.length;
+  if (newCount === 0 && skipCount === 0) {
+    console.log('    (none found)');
+  } else {
+    console.log(`    ${newCount} installed, ${skipCount} skipped`);
+  }
+
+  // --- Project settings ---
+  console.log('\n  Project settings (.claude/settings.json):');
+  if (projectSettings.status === 'skipped') {
+    console.log('    Skipped');
+  } else if (projectSettings.status === 'unchanged') {
+    console.log(`    Already up to date (${projectSettings.unchanged.length} keys unchanged)`);
+  } else {
+    const pAdded = projectSettings.added.length;
+    const pUnchanged = projectSettings.unchanged.length;
+    console.log(`    ${pAdded} key${pAdded !== 1 ? 's' : ''} added, ${pUnchanged} key${pUnchanged !== 1 ? 's' : ''} unchanged`);
+  }
+
+  // --- User settings ---
+  console.log('\n  User settings (~/.claude/settings.json):');
+  if (userSettings.status === 'skipped') {
+    console.log('    Skipped');
+  } else if (userSettings.status === 'unchanged') {
+    console.log(`    Already up to date (${userSettings.unchanged.length} keys unchanged)`);
+  } else {
+    const uAdded = userSettings.added.length;
+    const uUnchanged = userSettings.unchanged.length;
+    console.log(`    ${uAdded} key${uAdded !== 1 ? 's' : ''} added, ${uUnchanged} key${uUnchanged !== 1 ? 's' : ''} unchanged`);
+  }
+
+  // --- Gitignore ---
+  console.log('\n  .gitignore:');
+  switch (gitignore.status) {
+    case 'already-present':
+      console.log('    Already contains /plans — no changes');
+      break;
+    case 'updated':
+    case 'created':
+      console.log(`    ${gitignore.action === 'appended' ? 'Appended' : 'Created with'} /plans`);
+      break;
+    case 'dry-run':
+      console.log(`    ${gitignore.action}`);
+      break;
+    case 'skipped':
+      console.log(`    Skipped (${gitignore.reason || 'n/a'})`);
+      break;
+    default:
+      console.log(`    ${gitignore.status}`);
+  }
+
+  console.log('\n' + '='.repeat(60));
+
+  // --- Next steps (only after a real install, not dry-run) ---
+  if (!opts.dryRun) {
+    console.log('\n  Next steps:');
+    console.log('    1. Start a tmux session: tmux new -s dev');
+    console.log('    2. Run Claude Code: claude');
+    console.log('    3. Try creating a PRD: /prd');
+    console.log();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -927,19 +1028,24 @@ async function main() {
     const stack = await selectStack(opts, sourceDir);
 
     // Step 2: Install skill files
-    await installSkills(opts, sourceDir, stack, targetDir);
+    const skillsResult = await installSkills(opts, sourceDir, stack, targetDir);
 
     // Step 3: Merge project-level settings
-    await mergeProjectSettings(opts, sourceDir, stack, targetDir);
+    const projectSettingsResult = await mergeProjectSettings(opts, sourceDir, stack, targetDir);
 
     // Step 4: Merge user-level settings
-    await mergeUserSettings(opts, sourceDir, stack);
+    const userSettingsResult = await mergeUserSettings(opts, sourceDir, stack);
 
     // Step 5: Update .gitignore
-    await updateGitignore(opts, targetDir);
+    const gitignoreResult = await updateGitignore(opts, targetDir);
 
     // Step 6: Print summary
-    printSummary(opts);
+    printSummary(opts, {
+      skills: skillsResult || { installed: [], skipped: [] },
+      projectSettings: projectSettingsResult || { added: [], unchanged: [], status: 'skipped' },
+      userSettings: userSettingsResult || { added: [], unchanged: [], status: 'skipped' },
+      gitignore: gitignoreResult || { status: 'skipped' },
+    });
 
     console.log('\nInstallation complete.');
   } finally {
