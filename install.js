@@ -677,10 +677,170 @@ async function mergeProjectSettings(opts, sourceDir, stack, targetDir) {
 
 /**
  * Reverse-merge user-level settings into ~/.claude/settings.json.
- * HW-09-06 will implement the merge logic (using the utility from HW-09-04).
+ *
+ * - Reads the source user-settings.json from `<sourceDir>/<stack>/user-settings.json`.
+ * - Reads the target ~/.claude/settings.json (creates ~/.claude/ dir if needed).
+ * - Applies reverseMerge so that existing user values are preserved and only
+ *   missing keys are filled in from the source.
+ * - Handles invalid/empty JSON: warns and asks to overwrite or skip (--yes skips).
+ * - Writes the result atomically (temp file + rename).
+ * - In --dry-run mode, prints what would change without writing.
+ * - Prints a before/after summary of changes made.
  */
 async function mergeUserSettings(opts, sourceDir, stack) {
-  console.log('[TODO] mergeUserSettings: will be implemented in HW-09-06');
+  const sourceSettingsPath = path.join(sourceDir, stack, 'user-settings.json');
+  const claudeDir = path.join(os.homedir(), '.claude');
+  const targetSettingsPath = path.join(claudeDir, 'settings.json');
+
+  console.log('\nMerging user settings...');
+
+  // --- Read source user-settings.json ---
+  if (!fs.existsSync(sourceSettingsPath)) {
+    console.log(`  No user-settings.json found at ${sourceSettingsPath} — skipping.`);
+    return;
+  }
+
+  let sourceSettings;
+  try {
+    sourceSettings = JSON.parse(fs.readFileSync(sourceSettingsPath, 'utf8'));
+  } catch (err) {
+    console.error(`  Error: Could not parse source user-settings.json: ${err.message}`);
+    process.exit(1);
+  }
+
+  // --- Ensure ~/.claude/ directory exists ---
+  if (!fs.existsSync(claudeDir)) {
+    if (opts.dryRun) {
+      console.log(`  [DRY RUN] Would create directory: ${claudeDir}`);
+    } else {
+      fs.mkdirSync(claudeDir, { recursive: true });
+      console.log(`  Created directory: ${claudeDir}`);
+    }
+  }
+
+  // --- Read target ~/.claude/settings.json ---
+  let targetSettings = null;
+  let targetRaw = null;
+  let targetExisted = false;
+  let targetWasEmpty = false;
+
+  if (fs.existsSync(targetSettingsPath)) {
+    targetExisted = true;
+    targetRaw = fs.readFileSync(targetSettingsPath, 'utf8');
+
+    if (targetRaw.trim() === '') {
+      // Empty file — treat as no existing settings
+      console.log(`  Warning: ${targetSettingsPath} is empty.`);
+      targetSettings = {};
+      targetWasEmpty = true;
+    } else {
+      try {
+        targetSettings = JSON.parse(targetRaw);
+      } catch (parseErr) {
+        // Invalid JSON — prompt to overwrite or skip
+        console.warn(`  Warning: ${targetSettingsPath} contains invalid JSON: ${parseErr.message}`);
+
+        if (opts.yes) {
+          console.log('  --yes mode: skipping user settings merge (invalid target JSON).');
+          return;
+        }
+
+        // Interactive prompt: ask to overwrite or skip
+        const readline = require('readline');
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
+        const ask = (question) =>
+          new Promise((resolve) => rl.question(question, resolve));
+
+        try {
+          const answer = (
+            await ask('  Overwrite with hyperworker defaults? (y/N): ')
+          ).trim().toLowerCase();
+
+          if (answer === 'y' || answer === 'yes') {
+            targetSettings = {};
+            console.log('  Overwriting invalid settings file.');
+          } else {
+            console.log('  Skipping user settings merge.');
+            return;
+          }
+        } finally {
+          rl.close();
+        }
+      }
+    }
+  } else {
+    targetSettings = {};
+    targetWasEmpty = true;
+  }
+
+  // --- Reverse-merge: target wins, source fills gaps ---
+  const merged = reverseMerge(targetSettings, sourceSettings);
+
+  // --- Before/after summary ---
+  const beforeJson = JSON.stringify(targetSettings, null, 2);
+  const afterJson = JSON.stringify(merged, null, 2);
+
+  if (beforeJson === afterJson) {
+    console.log('  User settings already up to date — no changes needed.');
+    return;
+  }
+
+  // Compute key-level change summary
+  const beforeKeys = Object.keys(targetSettings);
+  const afterKeys = Object.keys(merged);
+  const addedKeys = afterKeys.filter((k) => !beforeKeys.includes(k));
+  const changedKeys = afterKeys.filter((k) => {
+    return JSON.stringify(targetSettings[k]) !== JSON.stringify(merged[k]);
+  });
+  const mergedExistingKeys = changedKeys.filter((k) => !addedKeys.includes(k));
+  const preservedKeys = beforeKeys.filter((k) => !changedKeys.includes(k));
+
+  console.log(`\n  User settings changes (~/.claude/settings.json):`);
+  if (addedKeys.length > 0) {
+    console.log(`    Keys added:     ${addedKeys.join(', ')}`);
+  }
+  if (mergedExistingKeys.length > 0) {
+    console.log(`    Keys merged:    ${mergedExistingKeys.join(', ')}`);
+  }
+  console.log(`    Keys preserved: ${preservedKeys.length > 0 ? preservedKeys.join(', ') : '(none — new file)'}`);
+
+  console.log('  --- Before ---');
+  if (targetWasEmpty) {
+    console.log('    (file did not exist or was empty)');
+  } else {
+    beforeJson.split('\n').forEach((line) => console.log(`    ${line}`));
+  }
+  console.log('  --- After ---');
+  afterJson.split('\n').forEach((line) => console.log(`    ${line}`));
+  console.log();
+
+  // --- Dry run: stop here ---
+  if (opts.dryRun) {
+    console.log('  [DRY RUN] Would write merged settings to ~/.claude/settings.json');
+    return;
+  }
+
+  // --- Atomic write: temp file + rename ---
+  const content = JSON.stringify(merged, null, 2) + '\n';
+  const tmpPath = path.join(claudeDir, `.settings.json.${process.pid}.tmp`);
+  try {
+    fs.writeFileSync(tmpPath, content, 'utf8');
+    fs.renameSync(tmpPath, targetSettingsPath);
+  } catch (writeErr) {
+    // Clean up temp file on failure
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    console.error(`  Error: Failed to write user settings: ${writeErr.message}`);
+    process.exit(1);
+  }
+
+  if (targetExisted && !targetWasEmpty) {
+    console.log(`  Updated ${targetSettingsPath}`);
+  } else {
+    console.log(`  Created ${targetSettingsPath}`);
+  }
 }
 
 /**
