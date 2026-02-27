@@ -272,14 +272,19 @@ function resolveSource(opts) {
 }
 
 // ---------------------------------------------------------------------------
-// Placeholder step functions (to be implemented in later stories)
+// Step functions
 // ---------------------------------------------------------------------------
 
 /**
  * Prompt the user to select a stack, or use the --stack flag value.
- * HW-09-02 will implement the interactive prompt.
+ *
+ * When --stack is provided via CLI, the prompt is skipped and the value is
+ * validated directly.  In --yes (non-interactive) mode without --stack, an
+ * error is raised so that CI pipelines always get a deterministic choice.
+ * Otherwise an interactive numbered menu is presented via Node's readline.
  */
 async function selectStack(opts, sourceDir) {
+  // --- Fast path: --stack provided via CLI flag ---
   if (opts.stack) {
     const stackDir = path.join(sourceDir, opts.stack);
     if (!fs.existsSync(stackDir)) {
@@ -290,15 +295,66 @@ async function selectStack(opts, sourceDir) {
     return opts.stack;
   }
 
+  // --- Non-interactive mode requires an explicit --stack value ---
   if (opts.yes) {
     console.error('Error: --yes mode requires --stack to be specified explicitly.');
     process.exit(1);
   }
 
-  // Placeholder: default to first available stack until HW-09-02 implements the prompt
-  console.log('[TODO] Interactive stack selection not yet implemented.');
-  console.log(`Defaulting to: ${AVAILABLE_STACKS[0]}`);
-  return AVAILABLE_STACKS[0];
+  // --- Build the list of stacks whose directories actually exist ---
+  const availableStacks = AVAILABLE_STACKS.filter((s) =>
+    fs.existsSync(path.join(sourceDir, s))
+  );
+
+  if (availableStacks.length === 0) {
+    console.error('Error: No stack directories found in source directory.');
+    process.exit(1);
+  }
+
+  // --- Interactive prompt via readline ---
+  const readline = require('readline');
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  // Helper: prompt once and return the answer
+  const ask = (question) =>
+    new Promise((resolve) => rl.question(question, resolve));
+
+  console.log('Which stack would you like to install?\n');
+  availableStacks.forEach((name, idx) => {
+    console.log(`  [${idx + 1}] ${name.charAt(0).toUpperCase() + name.slice(1)}`);
+  });
+  console.log();
+
+  try {
+    // Keep asking until we get a valid selection
+    while (true) {
+      const answer = (await ask('Enter selection (number): ')).trim();
+
+      // Accept a valid number
+      const num = parseInt(answer, 10);
+      if (!isNaN(num) && num >= 1 && num <= availableStacks.length) {
+        const selected = availableStacks[num - 1];
+        console.log(`\nSelected stack: ${selected}`);
+        return selected;
+      }
+
+      // Accept a valid stack name typed directly
+      if (availableStacks.includes(answer.toLowerCase())) {
+        const selected = answer.toLowerCase();
+        console.log(`\nSelected stack: ${selected}`);
+        return selected;
+      }
+
+      console.log(
+        `Invalid selection "${answer}". Please enter a number (1-${availableStacks.length}) or a stack name.`
+      );
+    }
+  } finally {
+    rl.close();
+  }
 }
 
 /**
