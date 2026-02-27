@@ -15,6 +15,67 @@ const DEFAULT_REMOTE_URL = 'https://github.com/joseph-ravenwolfe/hyperworker.git
 const AVAILABLE_STACKS = ['typescript', 'kubernetes'];
 
 // ---------------------------------------------------------------------------
+// Reverse-merge utility
+// ---------------------------------------------------------------------------
+
+/**
+ * Determine whether a value is a plain object (not an array, null, Date, etc.).
+ */
+function isPlainObject(val) {
+  return val !== null && typeof val === 'object' && !Array.isArray(val);
+}
+
+/**
+ * Merge `source` into `target` using reverse-merge semantics.
+ *
+ * - Source values fill in gaps but never overwrite existing target values.
+ * - Scalars: keep target's value if it exists (not null/undefined), else use source's.
+ * - Objects: recursively merge, keeping target's values where keys conflict.
+ * - Arrays: append unique entries from source not already in target (set-union,
+ *   exact string comparison, preserve order).
+ *
+ * Both arguments are left unmodified; a new object is returned.
+ *
+ * @param {object|null|undefined} target - The target object (takes priority).
+ * @param {object|null|undefined} source - The source object (fills gaps).
+ * @returns {object} The merged result.
+ */
+function reverseMerge(target, source) {
+  // Handle null/undefined edge cases
+  if (target == null && source == null) return {};
+  if (target == null) return JSON.parse(JSON.stringify(source));
+  if (source == null) return JSON.parse(JSON.stringify(target));
+
+  const result = {};
+
+  // Start with all keys from both objects
+  const allKeys = new Set([...Object.keys(target), ...Object.keys(source)]);
+
+  for (const key of allKeys) {
+    const tVal = target[key];
+    const sVal = source[key];
+
+    if (Array.isArray(tVal) && Array.isArray(sVal)) {
+      // Arrays: set-union — append unique entries from source not in target
+      result[key] = [...tVal, ...sVal.filter((v) => !tVal.includes(v))];
+    } else if (isPlainObject(tVal) && isPlainObject(sVal)) {
+      // Objects: recurse
+      result[key] = reverseMerge(tVal, sVal);
+    } else if (tVal !== undefined && tVal !== null) {
+      // Scalars: keep target if it exists (not null/undefined)
+      result[key] = tVal;
+    } else {
+      // Target missing or null — use source value (deep copy to avoid mutation)
+      result[key] = sVal !== undefined && sVal !== null && typeof sVal === 'object'
+        ? JSON.parse(JSON.stringify(sVal))
+        : sVal;
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Argument parsing
 // ---------------------------------------------------------------------------
 
@@ -181,11 +242,15 @@ function resolveSource(opts) {
 
   // Fall back to remote clone
   const remoteUrl = opts.remote || DEFAULT_REMOTE_URL;
-  console.log(`Stack directories not found locally. Cloning from: ${remoteUrl}`);
+  if (opts.remote) {
+    console.log(`Cloning from remote: ${remoteUrl}`);
+  } else {
+    console.log(`Stack directories not found locally. Cloning from: ${remoteUrl}`);
+  }
 
-  // Verify git is available
+  // Verify git is available (use git --version for cross-platform compatibility)
   try {
-    execSync('which git', { stdio: 'ignore' });
+    execSync('git --version', { stdio: 'ignore' });
   } catch {
     console.error('Error: git is required for remote installs but was not found on PATH.');
     process.exit(1);
