@@ -2,16 +2,48 @@
 
 A collection of Claude Code skills that turn Claude into a multi-agent team lead. Define a feature with a PRD, break it into tasks, then let a team of autonomous agents execute them in parallel — respecting dependency order, logging progress, and enforcing quality gates.
 
-## Get Started
+## Installation
 
-Pick the stack that matches your project:
+### Quick Install (recommended)
 
-| Stack | README | Description |
-|---|---|---|
-| **Kubernetes** | [kubernetes/README.md](kubernetes/README.md) | Kubernetes / DevOps — Flux suspend/resume, manifest validation, cluster safety rails |
-| **TypeScript** | [typescript/README.md](typescript/README.md) | TypeScript / Node.js — type checking, linting, test suite quality gates |
+```bash
+npx hyperworker-install --remote --stack typescript --target .
+```
 
-Each stack README is self-contained with prerequisites, installation, and usage instructions.
+This clones the repo, copies skills into `.claude/skills/`, and merges settings into your project — all without overwriting your existing configuration.
+
+### Options
+
+```bash
+# Interactive mode — prompts for stack selection and conflict resolution
+npx hyperworker-install --remote --target .
+
+# Preview what would change without writing any files
+npx hyperworker-install --remote --stack typescript --target . --dry-run
+
+# Non-interactive (CI-friendly) — auto-skips file conflicts
+npx hyperworker-install --remote --stack typescript --target . --yes
+
+# Install from a local clone instead of GitHub
+git clone https://github.com/joseph-ravenwolfe/hyperworker.git
+node hyperworker/install.js --stack typescript --target .
+```
+
+### What the installer does
+
+1. **Copies skills** into your project's `.claude/skills/` directory. If a skill file already exists, you're prompted to skip, overwrite, or diff.
+2. **Merges project settings** into `.claude/settings.json` using reverse-merge — your existing values are never overwritten, only gaps are filled.
+3. **Merges user settings** into `~/.claude/settings.json` with the same reverse-merge approach.
+4. **Updates `.gitignore`** to exclude `/plans` (where agent progress logs are stored).
+
+### Available Stacks
+
+| Stack | Description |
+|---|---|
+| **typescript** | TypeScript / Node.js — type checking, linting, test suite quality gates |
+| **kubernetes** | Kubernetes / DevOps — Flux suspend/resume, manifest validation, cluster safety rails |
+
+Each stack includes the same set of skills with stack-specific agent behavior, quality gates, and examples. See the stack READMEs for details: [typescript/README.md](typescript/README.md) · [kubernetes/README.md](kubernetes/README.md)
 
 ## Repository Structure
 
@@ -41,6 +73,8 @@ hyperworker/
 │   ├── settings.json                  # Project-level Claude settings template
 │   └── user-settings.json             # User-level Claude settings template
 │
+├── install.js                         # Installer script (npx hyperworker-install)
+├── package.json                       # Package manifest for npx
 ├── README.md                          # This file
 └── user-settings.json                 # Shared user-level settings template
 ```

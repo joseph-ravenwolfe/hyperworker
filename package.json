@@ -1,0 +1,9 @@
+{
+  "name": "hyperworker-install",
+  "version": "0.1.0",
+  "description": "Installer for Hyperworker Claude Code skills",
+  "bin": {
+    "hyperworker-install": "./install.js"
+  },
+  "license": "MIT"
+}
