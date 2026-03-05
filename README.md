@@ -55,9 +55,7 @@ hyperworker/
 │   │       ├── hyperworker/SKILL.md   # Multi-agent team lead (K8s variant)
 │   │       ├── prd/SKILL.md           # PRD generator (K8s examples)
 │   │       ├── prd-tasks/SKILL.md     # PRD-to-tasks converter (K8s variant)
-│   │       ├── refactor-agents-md/SKILL.md
-│   │       ├── refactor-claude-md/SKILL.md
-│   │       └── refactor-skills-md/SKILL.md
+│   │       └── refactor-md/SKILL.md   # Unified refactor skill
 │   ├── settings.json                  # Project-level Claude settings template
 │   └── user-settings.json             # User-level Claude settings template
 │
@@ -67,9 +65,7 @@ hyperworker/
 │   │       ├── hyperworker/SKILL.md   # Multi-agent team lead (TS variant)
 │   │       ├── prd/SKILL.md           # PRD generator (TS examples)
 │   │       ├── prd-tasks/SKILL.md     # PRD-to-tasks converter (TS variant)
-│   │       ├── refactor-agents-md/SKILL.md
-│   │       ├── refactor-claude-md/SKILL.md
-│   │       └── refactor-skills-md/SKILL.md
+│   │       └── refactor-md/SKILL.md   # Unified refactor skill
 │   ├── settings.json                  # Project-level Claude settings template
 │   └── user-settings.json             # User-level Claude settings template
 │
@@ -121,8 +117,6 @@ See each stack's README for technology-specific agent behavior details.
 | **hyperworker** | `/hyperworker` | Multi-agent team lead — dispatches and supervises autonomous agents |
 | **prd** | `/prd` | Generate a PRD from a feature description |
 | **prd-tasks** | `/prd-tasks` | Convert a PRD into dependency-ordered tasks |
-| **refactor-agents-md** | `/refactor-agents-md` | Refactor an AGENTS.md file for progressive disclosure |
-| **refactor-claude-md** | `/refactor-claude-md` | Refactor a CLAUDE.md file for progressive disclosure |
-| **refactor-skills-md** | `/refactor-skills-md` | Refactor a SKILL.md file for progressive disclosure |
+| **refactor-md** | `/refactor-md` | Refactor a CLAUDE.md, AGENTS.md, or SKILL.md file for progressive disclosure |
 
-The three refactor skills are identical across stacks. The hyperworker, prd, and prd-tasks skills have stack-specific variants.
+The refactor-md skill is identical across stacks. The hyperworker, prd, and prd-tasks skills have stack-specific variants.

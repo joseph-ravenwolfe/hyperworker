@@ -9,9 +9,7 @@ TypeScript / Node.js variant of [Hyperworker](../README.md) — a collection of 
 | **hyperworker** | `/hyperworker` | Multi-agent team lead — dispatches and supervises autonomous agents |
 | **prd** | `/prd` | Generate a PRD from a feature description |
 | **prd-tasks** | `/prd-tasks` | Convert a PRD into dependency-ordered tasks |
-| **refactor-agents-md** | `/refactor-agents-md` | Refactor an AGENTS.md file for progressive disclosure |
-| **refactor-claude-md** | `/refactor-claude-md` | Refactor a CLAUDE.md file for progressive disclosure |
-| **refactor-skills-md** | `/refactor-skills-md` | Refactor a SKILL.md file for progressive disclosure |
+| **refactor-md** | `/refactor-md` | Refactor a CLAUDE.md, AGENTS.md, or SKILL.md file for progressive disclosure |
 
 ## Agent Behavior
 
