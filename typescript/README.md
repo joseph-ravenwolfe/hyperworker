@@ -109,7 +109,7 @@ The user settings enable:
 {
   // Required: enables agent teams at the user level
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENTS_TEAMS": "1"
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   // Agents run in tmux panes for visibility
   "teammateMode": "tmux",

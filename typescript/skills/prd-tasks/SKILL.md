@@ -1,6 +1,6 @@
 ---
 name: prd-tasks
-description: "Convert PRDs to tasks using Claude's TaskCreate tool for autonomous agent execution. Use when you have an existing PRD and need to create tasks from it. Triggers on: convert this prd, turn this into tasks, create tasks from this, prd to tasks."
+description: "Convert PRDs to tasks using Claude's TaskCreate tool for autonomous agent execution. Use when you have an existing PRD and need to create tasks from it. Triggers on: convert this prd, turn this into tasks, create tasks from this, prd to tasks. Returns results only. Do not run in plan mode."
 user-invocable: true
 ---
 

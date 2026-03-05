@@ -1,6 +1,6 @@
 ---
 name: prd
-description: "Generate a Product Requirements Document (PRD) for a new feature. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out."
+description: "Generate a Product Requirements Document (PRD) for a new feature. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out. Returns results only. Do not run in plan mode."
 user-invocable: true
 ---
 
@@ -11,14 +11,14 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 ## The Job
 
 > **Placeholders used below:**
-> - `<ticket>` — the Jira ticket number provided by the user (e.g., `APP-1234`)
+> - `<ticket>` — the ticket number provided by the user (e.g., `APP-1234`)
 > - `<branch>` — derived from the ticket number + a short kebab-case slug of the feature description (e.g., `APP-1234-task-priority`)
 >
 > Substitute these placeholders with their actual values everywhere they appear.
 
 ### Phase 0: Environment Setup
-1. Receive a feature description from the user.
-2. Ask for the **Jira ticket number** (format: `APP-####`) using **AskUserQuestion**.
+1. Receive a feature description from the user. If you did not receive description during skill invocation, prompt the user for a detailed description before continuing.
+2. Ask for the **ticket number** (format: `OPS-####`) using **AskUserQuestion**. Allow them to specify branch name only as an Other option.
 3. Generate `<branch>` by combining `<ticket>` with a short, lowercase-kebab-case slug derived from the feature description (e.g., ticket `APP-1234` + description "Task Priority System" → `APP-1234-task-priority`).
 4. Update `.claude/settings.json`: set the value of `env.CLAUDE_CODE_TASK_LIST_ID` to `<branch>`.
 5. Run:
@@ -57,6 +57,19 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 - [ ] Any old `plans/<branch>-prd.md` is archived to `plans/archive/`
 - [ ] Non-goals section defines clear boundaries
 - [ ] Any newly discovered questions were appended to the bottom of **Open Questions** (with a phase marker)
+
+---
+
+# ✨ Final Artifact Checklist
+
+Before completing, use this checklist to validate all referenced artifacts and environment details exist and align. These actions must be taken.
+
+- [ ] The `<branch>` value matches across `.claude/settings.json`, the symlink, and referenced plans files.
+- [ ] `.claude/settings.json` contains `env.CLAUDE_CODE_TASK_LIST_ID` set to `<branch>`.
+- [ ] The symlink exists: `plans/<branch>` points to `~/.claude/tasks/<branch>`. Run `ls -l plans/<branch>` to confirm.
+- [ ] The file `plans/<branch>-prd.md` exists and contains the final PRD draft.
+- [ ] If an older PRD exists for this branch, it has been archived to `plans/archive/<branch>-prd.md`.
+- [ ] All checklist items under "Before Saving" have been individually checked.
 
 ---
 

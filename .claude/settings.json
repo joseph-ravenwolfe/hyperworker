@@ -17,7 +17,8 @@
       "Search(*)",
       "Glob(*)",
       "mcp__atlassian",
-      "mcp__Ref"
+      "mcp__Ref",
+      "mcp__n8n-mcp"
     ],
     "deny": [
       "Bash(gcloud*prod*)",
@@ -26,8 +27,8 @@
     ]
   },
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENTS_TEAMS": "1",
-    "CLAUDE_CODE_TASK_LIST_ID": "my-new-feature"
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_TASK_LIST_ID": "HW-10-n8n-email-order-status"
   },
   "enabledPlugins": {
     "github@claude-plugins-official": true,

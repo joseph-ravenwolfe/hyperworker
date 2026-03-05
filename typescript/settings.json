@@ -23,14 +23,13 @@
       "Bash(NODE_ENV=production*)",
       "Bash(cat *.env*)",
       "Bash(cat *.envrc*)",
-      "Bash(git push*)",
       "Bash(npm publish*)",
       "Bash(drop database*)",
       "Bash(DROP DATABASE*)"
     ]
   },
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENTS_TEAMS": "1",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "CLAUDE_CODE_TASK_LIST_ID": "my-new-feature"
   },
   "enabledPlugins": {

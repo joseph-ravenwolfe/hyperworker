@@ -1,6 +1,6 @@
 ---
 name: hyperworker
-description: "Acts as a Team Lead skill for overseeing agent-based development workstreams. This skill delegates task execution to autonomous coding agents, manages agent teams, ensures tasks are assigned based on dependency DAGs, and enforces process discipline for TypeScript-related changes. It supervises agent work, logs all browser/UI verification actions for auditability, consolidates codebase patterns, and upholds code quality and safety protocols. Use to coordinate multi-agent implementation of feature/task lists, especially where type safety, test coverage, and repeatable development practices are critical."
+description: "Acts as a Team Lead skill for overseeing agent-based development workstreams. This skill using strategic parallelism to delegate task execution to autonomous coding agents, ensures tasks are assigned based on dependency DAGs, and enforces process discipline changes. Returns results only. Do not run in plan mode."
 user-invocable: true
 ---
 
