@@ -42,8 +42,9 @@ node hyperworker/install.js --stack typescript --target .
 |---|---|
 | **typescript** | TypeScript / Node.js — type checking, linting, test suite quality gates |
 | **kubernetes** | Kubernetes / DevOps — Flux suspend/resume, manifest validation, cluster safety rails |
+| **mobile-app** | iOS Swift, Android Kotlin, React Native — platform-specific builds, linting, simulator/emulator QA |
 
-Each stack includes the same set of skills with stack-specific agent behavior, quality gates, and examples. See the stack READMEs for details: [typescript/README.md](typescript/README.md) · [kubernetes/README.md](kubernetes/README.md)
+Each stack includes the same set of skills with stack-specific agent behavior, quality gates, and examples. See the stack READMEs for details: [typescript/README.md](typescript/README.md) · [kubernetes/README.md](kubernetes/README.md) · [mobile-app/README.md](mobile-app/README.md)
 
 ## Repository Structure
 
@@ -73,6 +74,18 @@ hyperworker/
 │   ├── settings.json                  # Project-level Claude settings template
 │   └── user-settings.json             # User-level Claude settings template
 │
+├── mobile-app/                        # Mobile app stack (iOS / Android / React Native)
+│   ├── .claude/
+│   │   └── skills/
+│   │       ├── hyperworker/SKILL.md   # Multi-agent team lead (mobile variant)
+│   │       ├── prd/SKILL.md           # PRD generator (mobile examples)
+│   │       ├── prd-tasks/SKILL.md     # PRD-to-tasks converter (mobile variant)
+│   │       ├── refactor-agents-md/SKILL.md
+│   │       ├── refactor-claude-md/SKILL.md
+│   │       └── refactor-skills-md/SKILL.md
+│   ├── settings.json                  # Project-level Claude settings template
+│   └── user-settings.json             # User-level Claude settings template
+│
 ├── install.js                         # Installer script (npx hyperworker-install)
 ├── package.json                       # Package manifest for npx
 ├── README.md                          # This file
@@ -95,11 +108,11 @@ Hyperworker follows a **technology-agnostic** three-phase workflow:
 
 The workflow is the same regardless of technology stack. The skills within each technology directory provide stack-specific agent behavior, quality gates, and examples.
 
-| Workflow Phase | Kubernetes Variant | TypeScript Variant |
-|---|---|---|
-| `/prd` | [kubernetes/.claude/skills/prd/](kubernetes/.claude/skills/prd/SKILL.md) | [typescript/.claude/skills/prd/](typescript/.claude/skills/prd/SKILL.md) |
-| `/prd-tasks` | [kubernetes/.claude/skills/prd-tasks/](kubernetes/.claude/skills/prd-tasks/SKILL.md) | [typescript/.claude/skills/prd-tasks/](typescript/.claude/skills/prd-tasks/SKILL.md) |
-| `/hyperworker` | [kubernetes/.claude/skills/hyperworker/](kubernetes/.claude/skills/hyperworker/SKILL.md) | [typescript/.claude/skills/hyperworker/](typescript/.claude/skills/hyperworker/SKILL.md) |
+| Workflow Phase | Kubernetes Variant | TypeScript Variant | Mobile App Variant |
+|---|---|---|---|
+| `/prd` | [kubernetes/.claude/skills/prd/](kubernetes/.claude/skills/prd/SKILL.md) | [typescript/.claude/skills/prd/](typescript/.claude/skills/prd/SKILL.md) | [mobile-app/.claude/skills/prd/](mobile-app/.claude/skills/prd/SKILL.md) |
+| `/prd-tasks` | [kubernetes/.claude/skills/prd-tasks/](kubernetes/.claude/skills/prd-tasks/SKILL.md) | [typescript/.claude/skills/prd-tasks/](typescript/.claude/skills/prd-tasks/SKILL.md) | [mobile-app/.claude/skills/prd-tasks/](mobile-app/.claude/skills/prd-tasks/SKILL.md) |
+| `/hyperworker` | [kubernetes/.claude/skills/hyperworker/](kubernetes/.claude/skills/hyperworker/SKILL.md) | [typescript/.claude/skills/hyperworker/](typescript/.claude/skills/hyperworker/SKILL.md) | [mobile-app/.claude/skills/hyperworker/](mobile-app/.claude/skills/hyperworker/SKILL.md) |
 
 ### Agent Behavior
 

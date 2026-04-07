@@ -12,7 +12,7 @@ const { execSync } = require('child_process');
 // ---------------------------------------------------------------------------
 
 const DEFAULT_REMOTE_URL = 'https://github.com/joseph-ravenwolfe/hyperworker.git';
-const AVAILABLE_STACKS = ['typescript', 'kubernetes'];
+const AVAILABLE_STACKS = ['typescript', 'kubernetes', 'mobile-app'];
 const SKIP_RESULT = { added: [], unchanged: [], status: 'skipped' };
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ function parseArgs(argv) {
       case '--stack': {
         const val = args[++i];
         if (!val || val.startsWith('-')) {
-          console.error('Error: --stack requires a value (typescript or kubernetes).');
+          console.error(`Error: --stack requires a value (${AVAILABLE_STACKS.join(', ')}).`);
           process.exit(1);
         }
         if (!AVAILABLE_STACKS.includes(val)) {
@@ -259,7 +259,7 @@ OPTIONS
   --source <path>     Path to a local hyperworker clone (default: script's own repo)
   --remote [url]      Clone hyperworker from GitHub into a temp directory
                       (default URL: ${DEFAULT_REMOTE_URL})
-  --stack <name>      Stack variant to install: typescript or kubernetes
+  --stack <name>      Stack variant to install: typescript, kubernetes, or mobile-app
                       (skips interactive prompt)
   --dry-run           Preview changes without writing any files
   --yes, -y           Non-interactive mode (auto-skip conflicts, requires --stack)
