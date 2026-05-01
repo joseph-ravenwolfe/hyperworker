@@ -1,0 +1,11 @@
+{
+  "name": "hyperworker",
+  "version": "0.1.0",
+  "description": "PRD generation, task DAG dispatch, and Codex-driven code review for multi-agent feature delivery.",
+  "author": {
+    "name": "Joseph Ravenwolfe"
+  },
+  "dependencies": [
+    { "name": "codex", "version": "^1.0" }
+  ]
+}

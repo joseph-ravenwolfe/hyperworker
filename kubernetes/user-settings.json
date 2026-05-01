@@ -1,9 +1,0 @@
-{
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  },
-  "spinnerTipsEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
-  "bypassPermissions": true,
-  "teammateMode": "tmux"
-}

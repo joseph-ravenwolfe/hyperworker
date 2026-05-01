@@ -1,122 +1,103 @@
 # Hyperworker
 
-A collection of Claude Code skills that turn Claude into a multi-agent team lead. Define a feature with a PRD, break it into tasks, then let a team of autonomous agents execute them in parallel — respecting dependency order, logging progress, and enforcing quality gates.
+A Claude Code plugin that turns Claude into a multi-agent team lead. Define a feature with a PRD, break it into tasks, dispatch parallel autonomous agents to execute them, run an adversarial Codex review across the assembled diff, and verify the integrated feature against the PRD's acceptance criteria.
+
+## Workflow
+
+```
+/prd  →  /hyperworker
+```
+
+1. **`/prd`** — Generate a structured Product Requirements Document. The skill drafts from your description + the codebase, then conducts a design interview to resolve open questions before saving the final PRD.
+
+2. **`/hyperworker`** — Convert the PRD into a task DAG, dispatch parallel agents to implement them, run a Codex adversarial review, and verify against acceptance criteria. The skill walks through seven phases:
+
+   | Phase | What it does |
+   |---|---|
+   | 0 — Identify the PRD | Pick the PRD file and derive the branch slug |
+   | 1 — Create the Agent Team | `TeamCreate` with the branch as team name |
+   | 2 — Convert PRD to Tasks | `TaskCreate` per Task; cross-check against Functional Requirements |
+   | 3 — Set Task Dependencies | Build the DAG via `TaskUpdate(blocks, is_blocked_by)` |
+   | 4 — Dispatch Agents | Spawn agents for every unblocked Task; fan out as wide as the DAG allows |
+   | 5 — Code Review (Codex) | Adversarial review via the `codex` plugin; route blocking findings back to Phase 4 |
+   | 6 — Acceptance Testing | Verify every FR + Success Metric in the real environment |
 
 ## Installation
 
-### Quick Install (recommended)
+Hyperworker is a Claude Code plugin. It declares a hard dependency on OpenAI's [`codex` plugin](https://github.com/openai/codex-plugin-cc) (used for Phase 5's adversarial review), which Claude Code installs automatically.
 
 ```bash
-npx hyperworker-install --remote --stack typescript --target .
+# Add the marketplace
+/plugin marketplace add joseph-ravenwolfe/hyperworker
+
+# Install (codex is pulled in automatically as a dependency)
+/plugin install hyperworker@hyperworker
 ```
 
-This clones the repo, copies skills into `.claude/skills/`, and merges settings into your project — all without overwriting your existing configuration.
+Once installed, the skills are available as:
 
-### Options
+- `/hyperworker:prd`
+- `/hyperworker:hyperworker`
+- `/hyperworker:refactor-md`
 
-```bash
-# Interactive mode — prompts for stack selection and conflict resolution
-npx hyperworker-install --remote --target .
+The bare commands `/prd`, `/hyperworker`, and `/refactor-md` also work when no other plugin claims them.
 
-# Preview what would change without writing any files
-npx hyperworker-install --remote --stack typescript --target . --dry-run
+### Codex plugin requirement
 
-# Non-interactive (CI-friendly) — auto-skips file conflicts
-npx hyperworker-install --remote --stack typescript --target . --yes
+Phase 5 invokes `/codex:adversarial-review` from the `codex` plugin. The dependency is declared in `.claude-plugin/plugin.json`, so Claude Code resolves and installs it for you. If the codex plugin is missing or disabled, Phase 5 will fail; you can either install it or skip Phase 5 (acceptance testing in Phase 6 still runs).
 
-# Install from a local clone instead of GitHub
-git clone https://github.com/joseph-ravenwolfe/hyperworker.git
-node hyperworker/install.js --stack typescript --target .
-```
+You also need the Codex CLI itself installed and authenticated locally — see [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc) for setup.
 
-### What the installer does
+## Migrating from older versions
 
-1. **Copies skills** into your project's `.claude/skills/` directory. If a skill file already exists, you're prompted to skip, overwrite, or diff.
-2. **Merges project settings** into `.claude/settings.json` using reverse-merge — your existing values are never overwritten, only gaps are filled.
-3. **Merges user settings** into `~/.claude/settings.json` with the same reverse-merge approach.
-4. **Updates `.gitignore`** to exclude `/plans` (where agent progress logs are stored).
+Earlier versions of Hyperworker shipped as a `npx hyperworker-install` script that copied per-stack skill files into your project's `.claude/skills/`. That workflow is gone — Hyperworker is now a Claude Code plugin.
 
-### Available Stacks
+If you have a project set up with the old installer:
 
-| Stack | Description |
-|---|---|
-| **typescript** | TypeScript / Node.js — type checking, linting, test suite quality gates |
-| **kubernetes** | Kubernetes / DevOps — Flux suspend/resume, manifest validation, cluster safety rails |
+1. **Remove the old skill copies** from `.claude/skills/hyperworker/`, `.claude/skills/prd/`, `.claude/skills/prd-tasks/`, and `.claude/skills/refactor-md/`. The plugin owns these now.
+2. **Install the plugin** via the steps above.
+3. **`prd-tasks` is gone.** Its responsibilities (PRD → `TaskCreate` calls + DAG dependencies + FR cross-check) are now folded into `/hyperworker:hyperworker` Phases 2 and 3.
+4. **Per-stack variants are gone.** The single skill set is technology-agnostic and works for Kubernetes, TypeScript, Terraform, and any other stack.
+5. **PRD task format changed.** Tasks now use **Description / Approach / Acceptance criteria** instead of the older "How to complete this task" prescriptive checklists. Older PRDs still process, but you may want to regenerate them with the new format for cleaner agent handoffs.
 
-Each stack includes the same set of skills with stack-specific agent behavior, quality gates, and examples. See the stack READMEs for details: [typescript/README.md](typescript/README.md) · [kubernetes/README.md](kubernetes/README.md)
-
-## Repository Structure
-
-```
-hyperworker/
-├── kubernetes/                        # Kubernetes / DevOps stack
-│   ├── .claude/
-│   │   └── skills/
-│   │       ├── hyperworker/SKILL.md   # Multi-agent team lead (K8s variant)
-│   │       ├── prd/SKILL.md           # PRD generator (K8s examples)
-│   │       ├── prd-tasks/SKILL.md     # PRD-to-tasks converter (K8s variant)
-│   │       └── refactor-md/SKILL.md   # Unified refactor skill
-│   ├── settings.json                  # Project-level Claude settings template
-│   └── user-settings.json             # User-level Claude settings template
-│
-├── typescript/                        # TypeScript / Node.js stack
-│   ├── .claude/
-│   │   └── skills/
-│   │       ├── hyperworker/SKILL.md   # Multi-agent team lead (TS variant)
-│   │       ├── prd/SKILL.md           # PRD generator (TS examples)
-│   │       ├── prd-tasks/SKILL.md     # PRD-to-tasks converter (TS variant)
-│   │       └── refactor-md/SKILL.md   # Unified refactor skill
-│   ├── settings.json                  # Project-level Claude settings template
-│   └── user-settings.json             # User-level Claude settings template
-│
-├── install.js                         # Installer script (npx hyperworker-install)
-├── package.json                       # Package manifest for npx
-├── README.md                          # This file
-└── user-settings.json                 # Shared user-level settings template
-```
-
-## How It Works
-
-Hyperworker follows a **technology-agnostic** three-phase workflow:
-
-```
-/prd  →  /prd-tasks  →  /hyperworker
-```
-
-1. **`/prd`** — Generate a structured Product Requirements Document from a feature description. Claude asks clarifying questions across multiple refinement phases and produces a complete PRD with developer stories, functional requirements, design considerations, and open questions.
-
-2. **`/prd-tasks`** — Convert the PRD into a dependency-ordered task list using Claude's built-in `TaskCreate` tool. Each developer story becomes a right-sized task (completable in one agent context window). Dependencies are encoded so agents don't start work that depends on unfinished prerequisites. Functional requirements are cross-checked for full traceability.
-
-3. **`/hyperworker`** — The core skill. Claude acts as a Team Lead: it reads the task DAG, visualizes the dependency topology, creates an agent team, and dispatches up to 4 parallel agents to work through tasks. Each agent gets a focused prompt, implements its assigned story, runs quality checks, commits, and logs progress. The Team Lead supervises completion and assigns the next available work.
-
-The workflow is the same regardless of technology stack. The skills within each technology directory provide stack-specific agent behavior, quality gates, and examples.
-
-| Workflow Phase | Kubernetes Variant | TypeScript Variant |
-|---|---|---|
-| `/prd` | [kubernetes/.claude/skills/prd/](kubernetes/.claude/skills/prd/SKILL.md) | [typescript/.claude/skills/prd/](typescript/.claude/skills/prd/SKILL.md) |
-| `/prd-tasks` | [kubernetes/.claude/skills/prd-tasks/](kubernetes/.claude/skills/prd-tasks/SKILL.md) | [typescript/.claude/skills/prd-tasks/](typescript/.claude/skills/prd-tasks/SKILL.md) |
-| `/hyperworker` | [kubernetes/.claude/skills/hyperworker/](kubernetes/.claude/skills/hyperworker/SKILL.md) | [typescript/.claude/skills/hyperworker/](typescript/.claude/skills/hyperworker/SKILL.md) |
-
-### Agent Behavior
-
-Each dispatched agent:
-
-- Reads codebase patterns from `plans/progress.txt` before starting
-- Implements only its assigned task
-- Runs project quality checks (typecheck, lint, test)
-- Commits with the format `[Story ID] - [Story Title]`
-- Logs all work, file changes, and learnings to `plans/progress.txt`
-- Updates `CLAUDE.md` files with reusable patterns discovered during implementation
-
-See each stack's README for technology-specific agent behavior details.
-
-## Included Skills
+## Skills included
 
 | Skill | Command | Purpose |
 |---|---|---|
-| **hyperworker** | `/hyperworker` | Multi-agent team lead — dispatches and supervises autonomous agents |
-| **prd** | `/prd` | Generate a PRD from a feature description |
-| **prd-tasks** | `/prd-tasks` | Convert a PRD into dependency-ordered tasks |
-| **refactor-md** | `/refactor-md` | Refactor a CLAUDE.md, AGENTS.md, or SKILL.md file for progressive disclosure |
+| **prd** | `/hyperworker:prd` | Generate a PRD from a feature description; conducts a design interview |
+| **hyperworker** | `/hyperworker:hyperworker` | Multi-agent team lead — phases 0 through 6 |
+| **refactor-md** | `/hyperworker:refactor-md` | Refactor a `CLAUDE.md`, `AGENTS.md`, or `SKILL.md` for progressive disclosure |
 
-The refactor-md skill is identical across stacks. The hyperworker, prd, and prd-tasks skills have stack-specific variants.
+## Repository structure
+
+```
+hyperworker/
+├── .claude-plugin/
+│   ├── plugin.json          # Manifest + dependency on codex plugin
+│   └── marketplace.json     # Single-plugin marketplace listing
+├── skills/
+│   ├── prd/SKILL.md
+│   ├── hyperworker/SKILL.md
+│   └── refactor-md/SKILL.md
+├── plans/                   # User's working directory for in-flight PRDs (gitignored)
+└── README.md
+```
+
+## Agent behavior
+
+Each dispatched agent in Phase 4:
+
+- Reads codebase patterns from `plans/progress.txt` before starting
+- Implements only its assigned Task
+- Runs project quality checks (typecheck, lint, tests — whatever the project requires)
+- Commits with `[Task ID] - [Task Title]` once checks pass
+- Logs work, file changes, and reusable learnings to `plans/progress.txt`
+- Updates nearby `CLAUDE.md` files with patterns worth preserving
+
+See `skills/hyperworker/SKILL.md` for the full agent prompt.
+
+## Why a Codex review in Phase 5
+
+Cross-model review catches blind spots that same-model review misses. OpenAI's own `codex-plugin-cc` is built around exactly this pattern — Claude implements, Codex adversarially reviews. Hyperworker's Phase 5 wires up `/codex:adversarial-review` with the PRD injected as focus context, then auto-routes `critical`/`high` findings (confidence ≥ 0.7) back to Phase 4 as new fix Tasks. Lower-severity findings surface as advisory.
+
+The triage thresholds are tunable inside `skills/hyperworker/SKILL.md` if Codex is too noisy or too lenient on your stack.

@@ -1,0 +1,21 @@
+{
+  "name": "hyperworker",
+  "owner": {
+    "name": "Joseph Ravenwolfe"
+  },
+  "metadata": {
+    "description": "Multi-agent feature delivery: PRD -> task DAG -> parallel agent dispatch -> Codex code review.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "hyperworker",
+      "description": "PRD generation, task DAG dispatch, and Codex-driven code review for multi-agent feature delivery.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Joseph Ravenwolfe"
+      },
+      "source": "."
+    }
+  ]
+}
