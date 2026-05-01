@@ -127,15 +127,21 @@ This phase requires the `codex` plugin to be installed; it is declared as a depe
 
 ### Step 1: Invoke the review
 
-Invoke `/codex:adversarial-review` with the focus argument set to the PRD context, so Codex reviews against intent rather than just the code in isolation:
+Build the focus argument by concatenating three layers:
+
+1. **Plugin-level review guidance.** Read the file at `prompts/review-guidance.md` inside this plugin (locate it with `Glob` for `**/hyperworker/prompts/review-guidance.md` if you don't have an absolute path). It captures plugin-wide rules around module/function size, complexity, and unit-test expectations.
+2. **PRD reference.** `Review against the PRD at plans/<branch>-prd.md so Codex reviews against intent rather than just the code in isolation.`
+3. **Phase-specific focus.** `(a) every Functional Requirement (FR-1..FR-N) is enforced by the code, not merely present; (b) cross-task integration points (API ↔ worker ↔ DB; UI ↔ API; infra ↔ deploy); (c) security, data integrity, idempotency, rollback safety per the codex adversarial bar.`
+
+Concatenate the three into a single focus string and invoke:
 
 ```
-/codex:adversarial-review --base main Review against the PRD at plans/<branch>-prd.md. Focus on: (1) every Functional Requirement (FR-1..FR-N) is enforced by the code, not merely present; (2) cross-task integration points (API ↔ worker ↔ DB; UI ↔ API; infra ↔ deploy); (3) security, data integrity, idempotency, and rollback safety per the codex adversarial bar.
+/codex:adversarial-review --base main "<concatenated focus argument>"
 ```
 
-If the change is large (>5 files or >300 LOC), append `--background` so the review runs in a Claude background task; poll with `/codex:status` and retrieve via `/codex:result`.
+If the change is large (>5 files or >300 LOC), append `--background` so the review runs in a Claude background task; poll with `/codex:status` and retrieve with `/codex:result`.
 
-### Step 2: Parse the structured output
+### Step 2: Capture the structured output
 
 Codex returns JSON matching the codex plugin's `review-output` schema. Fields used here:
 
@@ -144,31 +150,40 @@ Codex returns JSON matching the codex plugin's `review-output` schema. Fields us
 - `summary` — terse ship/no-ship assessment
 - `next_steps[]` — Codex's suggested follow-ups
 
-### Step 3: Triage findings
+Append the **full** Codex JSON output to `plans/progress.txt` under a `## Phase 5 Codex Review` section so the original review is auditable after fixes land.
 
-Apply this rule (tunable):
+### Step 3: Triage findings
 
 | severity | confidence | action |
 |---|---|---|
-| `critical` or `high` | ≥ 0.7 | **Block.** Create a follow-up Task per finding (see below). |
-| `critical` or `high` | < 0.7 | Surface to user with a `low-confidence` label; let them decide whether to block. |
-| `medium` | any | Advisory — surface, but do not auto-create Tasks. |
-| `low` | any | Drop. Usually nitpicks; filter unless the user explicitly asks for them. |
+| `critical` or `high` | ≥ 0.7 | **Block.** Resolve in Step 4. |
+| `critical` or `high` | < 0.7 | Surface to user with a `low-confidence` label; ask whether to block before resolving. |
+| `medium` | any | Advisory — surface, do not auto-resolve. |
+| `low` | any | Drop. Filter unless the user explicitly asks for them. |
 
-For each blocking finding, call `TaskCreate` with:
-- **Subject:** `<branch>-fix-NN: <finding.title>`
-- **Description:** finding `body` + `file` + `line_start`-`line_end` + `recommendation`, framed in the standard Description / Approach / Acceptance criteria structure.
+### Step 4: Resolve blocking findings inline
 
-Do not set up a parallel fanout for fix Tasks — they typically need to land before re-review.
+Group blocking findings by file or by tightly-related logical cluster. For each group, dispatch ONE **fix agent** via the Task tool. Run them in parallel.
 
-### Step 4: Decide
+Each fix agent receives:
+- The full Codex finding(s) for its group — title, body, severity, confidence, file, lines, recommendation
+- Instructions to:
+  - Read the affected file(s) and the surrounding context the finding cites
+  - Fix the finding inline, scoped to the affected lines, **without redesigning surrounding code or expanding scope** beyond what the finding calls out
+  - Commit with message `[<branch>-fix-NN] <finding title>`
+- Permission to consult the original Task list (`TaskList`) and `git blame` to understand which Task introduced the code, but no requirement to coordinate with other fix agents
 
-- **Any blocking Tasks created** → loop back to **Phase 4: Dispatch Agents** to work them, then re-run Phase 5.
-- **Verdict is `approve`** or **only advisory findings remain** → proceed to **Phase 6: Acceptance Testing**.
+Fix agents do NOT re-enter Phase 4, do NOT share state with each other, and do NOT have license to fix issues Codex didn't flag.
+
+### Step 5: Decide
+
+After all fix agents finish, **proceed to Phase 6**. **Do NOT re-run Codex.** Adversarial reviewers tend to surface fresh concerns on every pass, so re-running creates a perpetual no-ship loop. The single Codex pass plus Phase 6's per-Task verifier is the bounded-cost design — Phase 6 catches anything the fix agents broke.
+
+If Codex's initial verdict was `approve` or only advisory findings remained after Step 3, skip Step 4 and proceed directly to Phase 6.
 
 ### Calibration
 
-Track the disagree rate over time. If Codex flags blocking issues on <10% of PRDs, the cost is well-spent. If >30%, your prompt or PRD acceptance criteria are too noisy — tighten the focus argument or revisit how Phase 2 specifies Approach + Acceptance criteria.
+Track the blocking-finding rate over time. If Codex flags blocking issues on <10% of PRDs, the cost is well-spent. If >30%, your PRD acceptance criteria or the review-guidance file are noisy — tighten the focus argument, revisit Phase 2's task structure, or update `prompts/review-guidance.md` to ban the categories that keep firing.
 
 ## Phase 6: Acceptance Testing
 
