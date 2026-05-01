@@ -24,15 +24,20 @@ A Claude Code plugin that turns Claude into a multi-agent team lead. Define a fe
 
 ## Installation
 
-Hyperworker is a Claude Code plugin. It declares a hard dependency on OpenAI's [`codex` plugin](https://github.com/openai/codex-plugin-cc) (used for Phase 5's adversarial review), which Claude Code installs automatically.
+Hyperworker is a Claude Code plugin. It declares a hard dependency on OpenAI's [`codex` plugin](https://github.com/openai/codex-plugin-cc) for Phase 5's adversarial review. Cross-marketplace dependencies require both marketplaces to be configured before install, so add the codex marketplace first:
 
 ```bash
-# Add the marketplace
-/plugin marketplace add joseph-ravenwolfe/hyperworker
+# 1. Add OpenAI's codex marketplace (required dependency source)
+claude plugin marketplace add openai/codex-plugin-cc
 
-# Install (codex is pulled in automatically as a dependency)
-/plugin install hyperworker@hyperworker
+# 2. Add the hyperworker marketplace
+claude plugin marketplace add joseph-ravenwolfe/hyperworker
+
+# 3. Install (codex is pulled in automatically as a dependency)
+claude plugin install hyperworker@hyperworker
 ```
+
+You can also use the `/plugin` slash command from inside Claude Code instead of the CLI.
 
 Once installed, the skills are available as:
 

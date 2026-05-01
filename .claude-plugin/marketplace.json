@@ -3,6 +3,7 @@
   "owner": {
     "name": "Joseph Ravenwolfe"
   },
+  "allowCrossMarketplaceDependenciesOn": ["openai-codex"],
   "metadata": {
     "description": "Multi-agent feature delivery: PRD -> task DAG -> parallel agent dispatch -> Codex code review.",
     "version": "0.1.0"
@@ -15,7 +16,7 @@
       "author": {
         "name": "Joseph Ravenwolfe"
       },
-      "source": "."
+      "source": "./plugins/hyperworker"
     }
   ]
 }

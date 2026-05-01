@@ -6,6 +6,6 @@
     "name": "Joseph Ravenwolfe"
   },
   "dependencies": [
-    { "name": "codex", "version": "^1.0" }
+    { "name": "codex", "marketplace": "openai-codex", "version": "^1.0" }
   ]
 }
