@@ -172,44 +172,152 @@ Track the disagree rate over time. If Codex flags blocking issues on <10% of PRD
 
 ## Phase 6: Acceptance Testing
 
-After Phase 5 clears, run end-to-end acceptance testing against the PRD's **Functional Requirements** and **Success Metrics**. Goal: confirm the assembled feature actually works as a whole — not just that each Task passed its own per-task acceptance criteria.
+After Phase 5 clears, run end-to-end acceptance testing. Goal: confirm every Task's claimed completion is reflected in the **live runtime**, not merely in the diff — and that the assembled feature satisfies the PRD's Functional Requirements and Success Metrics.
 
-### Step 1: Build the verification matrix
+Verification is **adversarial**. Default to skepticism. Implementer agents routinely commit code without running it, write manifests without applying them, leave TODOs / FIXMEs / "user should manually" notes, and stop at permission prompts while claiming completion. Treat any of these as a verification failure.
 
-Read the PRD's Functional Requirements (`FR-1`, `FR-2`, …) and Success Metrics sections. For each item, determine the verification method using the same domain table the prd skill uses:
+### Architecture: per-Task verifier agents
 
-| Domain | Verification |
+For every Task that completed in Phase 4, dispatch one **verifier agent** in parallel — same fan-out pattern as Phase 4 implementers. Each verifier independently audits ONE Task, attempts to fix any gaps it finds, re-verifies, and reports a terminal verdict. Verifiers do not share state with each other or with the original implementer.
+
+Use the Task tool to spawn each verifier with the **Verifier Agent Prompt** (below) plus the Task ID.
+
+### The four-axis verification rubric (stack-agnostic)
+
+For every Acceptance criterion in the Task, check all four axes in order:
+
+| Axis | Question |
 |---|---|
-| Web UI | Exercise the feature in a browser — happy path + at least one edge case |
-| Kubernetes | `kubectl get/describe` confirms expected state; reconcile is clean |
-| Terraform | Resource exists in the provider console; `terraform plan` is empty |
-| Database | Query returns expected results; migrations apply + rollback cleanly |
-| API | Endpoint responds with correct status and payload |
+| **Present** | Is the change committed in the repo? |
+| **Applied** | Has the change been pushed to its real runtime by whatever means is canonical for this stack — deploy / apply / push / publish / migrate? |
+| **Observable** | Does querying the runtime now return the new state? |
+| **Behaves** | Does exercising the change end-to-end produce the expected result? |
 
-If a domain is not listed, derive an equivalent: **actually run the thing, observe the result, confirm it matches the requirement.**
+The verifier infers what "the runtime" means by reading the Acceptance criteria — UI criteria → the deployed web app, cluster criteria → the K8s cluster, API criteria → the live endpoint, infra criteria → the cloud provider console. The prompt deliberately does not enumerate stacks; the verifier picks the right tooling per Task.
 
-### Step 2: Run the verifications
+### Deferral signals
 
-Walk every FR and Success Metric. For each:
+Audit the implementer's progress log entry and final commit message explicitly for:
 
-1. Run the verification in the real (staging) environment.
-2. Record the result (pass / fail) with concrete evidence — command + output, screenshot, query result, or equivalent.
-3. Append the evidence to `tasks/progress.txt` under a `## Phase 6 Acceptance Verification` section.
+- **Linguistic markers**: `"user should"`, `"manually apply"`, `"awaiting merge"`, `"left for follow-up"`, `"TODO"`, `"FIXME"`, `"in a future PR"`, `"you can now"`. Quote the offending phrase verbatim into the verifier output.
+- **Tool-call audit**: did the implementer invoke a runtime-mutating action (apply / deploy / push / migrate / exec / run / publish), or only file-write tools? File-only with a runtime-axis criterion is a strong deferral signal.
+- **Diff/runtime mismatch**: diff claims version V2; runtime reports V1.
 
-This phase is integration-focused — exercise the cross-task seams (API → worker → DB; UI → API; Terraform → K8s deployment). The per-task QA covered each unit; this covers the assembly.
+### Browser-based verification
 
-### Step 3: Triage failures
+This pipeline runs Claude Code in `--chrome` mode. For any **Behaves** axis check involving a web UI (clicking buttons, observing visual state, exercising forms), use the `mcp__claude-in-chrome__*` tools — `navigate`, `read_page`, `find`, `form_input`, `get_screenshot`, etc. Do not approximate UI verification by reading source code.
 
-For each failed FR or Success Metric, call `TaskCreate` with:
-- **Subject:** `<branch>-accept-NN: <FR ID> — <what failed>`
-- **Description:** the verification step that failed, observed vs. expected behavior, and the relevant FR text from the PRD — in the standard Description / Approach / Acceptance criteria structure.
+If the Chrome MCP tools are not visible at runtime and a UI verification is required, stop and instruct the user to relaunch Claude Code with the `--chrome` flag. Do not proceed with a synthetic verdict.
 
-### Step 4: Decide
+### Verifier fixes inline
 
-- **Any acceptance Tasks created** → loop back to **Phase 4** to dispatch them, then re-run Phase 6.
-- **All FRs and Success Metrics pass** → mark the team complete. Output a one-paragraph completion summary: PRD title, total Tasks dispatched, Phase 5/6 cycle count, and a link to `tasks/progress.txt`.
+If a verification fails, the verifier **fixes the gap inline** rather than handing off to a fresh agent. The verifier has already built up the relevant context — the Task spec, the diff, the runtime state, and the precise failure mode. Handing off discards that context.
 
-**The team is not done until Phase 6 passes cleanly.** Per-task `done` status is necessary but not sufficient — the integrated feature must actually work.
+**The verifier may fix:**
+- Deferred runtime actions: apply / deploy / push / publish / migrate / exec / run
+- Implementation gaps revealed by the verification (missing edge case, wrong field name, off-by-one, etc.) — scoped to the failed Acceptance criterion
+
+**The verifier MUST NOT:**
+- Silently elevate permissions
+- Take destructive actions (drop tables, delete resources, force-push) without explicit user approval
+- Re-design the Task or expand its scope beyond the failed Acceptance criteria
+
+After each fix, re-run the four-axis check for the affected criterion. Loop until verified or until you hit a hard blocker.
+
+### Hard blockers
+
+When you cannot fix because of missing access, missing creds, or a destructive action that needs approval, do NOT silently elevate. Stop and emit a structured blocker:
+
+```json
+{
+  "required_action": "what would unblock the verification",
+  "command_or_step": "the literal command or UI step",
+  "reason_blocked": "permission | missing-creds | requires-human-approval | requires-destructive-action",
+  "suggested_role": "human | elevated-agent"
+}
+```
+
+The Team Lead routes blockers to the user.
+
+### Verifier output
+
+Each verifier returns JSON shaped like:
+
+```json
+{
+  "task_id": "<branch>-NN",
+  "verdict": "verified" | "unverifiable",
+  "summary": "one-line ship/no-ship assessment",
+  "axis_results": [
+    {
+      "axis": "present|applied|observable|behaves",
+      "status": "pass|fail|fixed|blocked",
+      "evidence": "command + observed output / query + result / UI exercise + observation",
+      "claim_quote": "verbatim snippet from implementer's progress log or commit",
+      "fix_applied": "what the verifier did to bring this axis to pass, if anything"
+    }
+  ],
+  "blockers": []
+}
+```
+
+Every `evidence` field is a citation of an actual command/query/exercise + observed output, not a summary. Every `claim_quote` is a verbatim quote from the implementer's progress log or commit, not a paraphrase.
+
+The verdict is binary: `verified` (every axis passes after any inline fixes) or `unverifiable` (a hard blocker stopped the verifier from reaching `verified`). The richer "deferred" / "broken" distinction is captured per-axis in `status` and `fix_applied`.
+
+### Team Lead decision
+
+After all verifier agents finish:
+
+- **Every Task `verified`** → mark the team complete. Output a one-paragraph completion summary: PRD title, total Tasks dispatched, Phase 5/6 cycle count, link to `tasks/progress.txt`.
+- **Any Task `unverifiable`** → escalate the structured blockers from those Tasks to the user. Pause until they're resolved.
+
+**The team is not done until every Task verifies cleanly.** Per-task `done` from Phase 4 is necessary but not sufficient — the integrated feature must actually work in its real runtime.
+
+---
+
+## Verifier Agent Prompt
+
+You are a runtime verification agent. Your job is to confirm that a code-change Task has been **effectively applied to its real runtime** — not merely present in the diff.
+
+You are NOT reviewing the code. You are checking whether the world has changed.
+
+### Inputs
+
+- The Task ID (passed to you when spawned). Retrieve the Task via `TaskGet`.
+- The implementer agent's diff (read via `git log` / `git show` for the Task's commit).
+- The implementer agent's progress log entry at `plans/progress.txt`.
+- Access to whatever runtime the Task targets (cluster, deployed app, cloud provider, database, API).
+
+### Default stance
+
+Default to skepticism. Implementer agents routinely:
+- Commit code without running it
+- Write manifests without applying them
+- Mark a task done while waiting for human approval
+- Leave TODOs / FIXMEs / "user should manually" notes
+- Stop at a permission prompt and claim completion anyway
+
+Treat any of these as a verification failure.
+
+### Method
+
+For each Acceptance criterion in the Task, check all four axes (Present / Applied / Observable / Behaves) as defined in the parent skill. Translate each axis into the right tooling for this Task's runtime — you decide what "the runtime" means by reading the Acceptance criteria, not from a stack-keyed table.
+
+For UI criteria, use the `mcp__claude-in-chrome__*` tools to actually drive the browser. If those tools are not visible, stop and tell the user to relaunch with `--chrome`.
+
+If any axis fails, **fix the gap inline** within the bounds defined in the parent skill (deferred runtime actions and implementation gaps scoped to the failed criterion; never destructive actions without approval, never silent privilege elevation). Re-verify after each fix.
+
+### Output
+
+Return only valid JSON matching the verifier output schema in the parent skill. Be concrete:
+- Every `evidence` field cites a real command + its observed output, a query + its result, or a UI exercise + the observed outcome.
+- Every `claim_quote` is a verbatim snippet from the implementer's progress log or commit message.
+- `fix_applied` describes what you changed and shows the post-fix evidence.
+
+If you hit a hard blocker, set `verdict: unverifiable`, populate `blockers`, and stop. Do not produce a synthetic `verified` verdict to avoid the blocker.
+
+Append your full verification record (axis results + evidence + any fixes) to `plans/progress.txt` under a `## Phase 6 Verification — <Task ID>` section before exiting.
 
 ---
 
