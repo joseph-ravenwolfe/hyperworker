@@ -181,10 +181,6 @@ After all fix agents finish, **proceed to Phase 6**. **Do NOT re-run Codex.** Ad
 
 If Codex's initial verdict was `approve` or only advisory findings remained after Step 3, skip Step 4 and proceed directly to Phase 6.
 
-### Calibration
-
-Track the blocking-finding rate over time. If Codex flags blocking issues on <10% of PRDs, the cost is well-spent. If >30%, your PRD acceptance criteria or the review-guidance file are noisy — tighten the focus argument, revisit Phase 2's task structure, or update `prompts/review-guidance.md` to ban the categories that keep firing.
-
 ## Phase 6: Acceptance Testing
 
 After Phase 5 clears, run end-to-end acceptance testing. Goal: confirm every Task's claimed completion is reflected in the **live runtime**, not merely in the diff — and that the assembled feature satisfies the PRD's Functional Requirements and Success Metrics.
